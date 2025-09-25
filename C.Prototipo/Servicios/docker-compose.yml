@@ -1,0 +1,188 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto
+    container_name: mosquitto_proyecto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto:/mosquitto/config
+      - ./mosquitto:/mosquitto/data
+      - ./mosquitto:/mosquitto/log
+    networks:
+      - proyecto_iot_net
+    user: "root"
+
+  web_app:
+    build:
+      context: .
+      dockerfile: Dockerfile.web_app
+    container_name: web_app_proyecto
+    restart: unless-stopped
+    # Retiramos los puertos públicos
+    volumes:
+      - ./app.py:/app/app.py
+      - ./templates:/app/templates
+    networks:
+      - proyecto_iot_net
+    depends_on:
+      - mosquitto
+    command: gunicorn --worker-class eventlet -w 1 -b 0.0.0.0:5000 app:app
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb_proyecto
+    restart: unless-stopped
+    # Retiramos los puertos públicos
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUX_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUX_TOKEN}
+    env_file: ./.env
+    networks:
+      - proyecto_iot_net
+
+  telegraf:
+    image: telegraf:1.30
+    container_name: telegraf_proyecto
+    restart: unless-stopped
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    env_file: ./.env
+    networks:
+      - proyecto_iot_net
+    depends_on:
+      - mosquitto
+      - influxdb
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana_proyecto
+    restart: unless-stopped
+    # Retiramos los puertos públicos
+    volumes:
+      - grafana_data:/var/lib/grafana
+    env_file: ./.env
+    networks:
+      - proyecto_iot_net
+    depends_on:
+      - influxdb
+
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm_proyecto
+    ports:
+      - "80:80"
+      - "81:81"
+      - "443:443"
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+    networks:
+      - proyecto_iot_net
+    depends_on:
+      - grafana
+      - influxdb
+      - mosquitto
+    restart: unless-stopped
+
+  my-api:
+    image: nginx:latest
+    container_name: my_api_proyecto
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - proyecto_iot_net
+
+  publicador_ubicacion:
+    build:
+      context: .
+      dockerfile: Dockerfile.publisher
+    container_name: publicador_ubicacion_proyecto
+    restart: unless-stopped
+    networks:
+      - proyecto_iot_net
+    depends_on:
+      - mosquitto
+
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: postgis_proyecto
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    # Retiramos los puertos públicos
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    networks:
+      - proyecto_iot_net
+  
+  geoproc_app:
+    build:
+      context: .
+      dockerfile: Dockerfile.geoproc_app
+    container_name: geoproc_proyecto
+    restart: unless-stopped
+    volumes:
+      - ./geoproc_app:/app
+    networks:
+      - proyecto_iot_net
+    env_file: ./.env
+    depends_on:
+      - mosquitto
+      - postgis
+    command: python /app/geoproc.py
+    expose:
+      - 8000
+
+  node_red:
+    image: nodered/node-red:latest
+    container_name: node_red_proyecto
+    restart: unless-stopped
+    # Retiramos los puertos públicos
+    volumes:
+      - node_red_data:/data
+    networks:
+      - proyecto_iot_net
+    depends_on:
+      - mosquitto
+      - postgis
+
+  cloudflare_tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflare_tunnel
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run 2bfb4869-d2fa-4517-a654-929d432f9a26
+    volumes:
+      - ./cloudflared/credentials.json:/etc/cloudflared/credentials.json:ro
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ./cloudflared/cert.pem:/etc/cloudflared/cert.pem:ro
+    networks:
+      - proyecto_iot_net
+    depends_on:
+      - npm # El túnel depende de que Nginx Proxy Manager esté listo
+      
+networks:
+  proyecto_iot_net:
+    driver: bridge
+
+volumes:
+  influxdb_data:
+  grafana_data:
+  npm_data:
+  npm_letsencrypt:
+  mosquitto_data:
+  mosquitto_log:
+  postgis_data:
+  node_red_data:
