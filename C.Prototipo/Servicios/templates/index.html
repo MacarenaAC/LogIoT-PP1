@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <link rel="manifest" href="/manifest.json">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard SYNKRO</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 2px 0 20px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            transition: all 0.3s ease;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .nav-tab.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .nav-tab:hover {
+            background: #e9ecef;
+        }
+
+        .tab-content {
+            padding: 20px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        .truck-card {
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .truck-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        .truck-header {
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+        }
+
+        .truck-header.en_viaje {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .truck-header.cargando {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+            color: white;
+        }
+
+        .truck-header.entregado, .truck-header.regresando, .truck-header.en_base {
+            background: linear-gradient(135deg, #17a2b8, #6610f2);
+            color: white;
+        }
+
+        .truck-info {
+            flex: 1;
+        }
+
+        .truck-id {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        .truck-status {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .expand-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .truck-card.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .truck-details {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .truck-card.expanded .truck-details {
+            max-height: 400px;
+            padding: 15px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .detail-value {
+            color: #6c757d;
+        }
+
+        .order-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+
+        .order-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .order-item.urgente {
+            border-left-color: #dc3545;
+        }
+
+        .order-item.alta {
+            border-left-color: #fd7e14;
+        }
+
+        .order-item.normal {
+            border-left-color: #28a745;
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .order-id {
+            font-weight: bold;
+            color: #495057;
+        }
+
+        .priority-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .priority-badge.urgente {
+            background: #dc3545;
+            color: white;
+        }
+
+        .priority-badge.alta {
+            background: #fd7e14;
+            color: white;
+        }
+
+        .priority-badge.normal {
+            background: #28a745;
+            color: white;
+        }
+
+        .mqtt-section {
+            margin-bottom: 20px;
+        }
+
+        .mqtt-command {
+            background: #343a40;
+            color: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            border: none;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mqtt-command:hover {
+            background: #495057;
+        }
+
+        .mqtt-message {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            border-left: 4px solid #667eea;
+        }
+
+        .mqtt-message .timestamp {
+            color: #6c757d;
+            font-size: 0.8rem;
+        }
+
+        .mqtt-message .topic {
+            font-weight: bold;
+            color: #495057;
+        }
+
+        .mqtt-message .payload {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        #mqtt-messages {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        .status-bar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .status-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-icon {
+            margin-right: 8px;
+            font-size: 1.1rem;
+        }
+
+        .about-us-link {
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            margin: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .about-us-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .about-us-link a:hover {
+            text-decoration: underline;
+        }
+
+        #about-us {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            z-index: 3000;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        #about-us.active {
+            display: block;
+        }
+
+        #about-us .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6c757d;
+        }
+
+        #about-us h2 {
+            color: #495057;
+            margin-bottom: 15px;
+        }
+
+        #about-us p {
+            color: #6c757d;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: absolute;
+                z-index: 2000;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .menu-toggle {
+                position: absolute;
+                top: 20px;
+                left: 20px;
+                z-index: 3000;
+                background: rgba(255, 255, 255, 0.9);
+                border: none;
+                padding: 10px;
+                border-radius: 50%;
+                cursor: pointer;
+            }
+        }
+
+        .leaflet-control-zoom {
+        top: auto !important;
+        left: auto !important;
+        bottom: 20px !important; /* Colocar en la parte inferior */
+        right: 20px !important; /* Colocar a la derecha */
+    }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #495057;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-title i {
+            margin-right: 8px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <button class="menu-toggle" onclick="toggleSidebar()" style="display: none;">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <div class="container">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1><i class="fas fa-truck"></i> SYNKRO</h1>
+                <p>Sistema de Gestión Logística</p>
+            </div>
+
+            <div class="nav-tabs">
+                <button class="nav-tab active" onclick="switchTab('trucks')">
+                    <i class="fas fa-truck"></i> Flota
+                </button>
+                <button class="nav-tab" onclick="switchTab('orders')">
+                    <i class="fas fa-box"></i> Pedidos
+                </button>
+                <button class="nav-tab" onclick="switchTab('commands')">
+                    <i class="fas fa-terminal"></i> MQTT
+                </button>
+            </div>
+
+            <div class="tab-content">
+                <div class="tab-panel active" id="trucks-panel">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number" id="active-trucks">0</div>
+                            <div class="stat-label">Activos</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-deliveries">0</div>
+                            <div class="stat-label">Entregas</div>
+                        </div>
+                    </div>
+                    
+                    <div class="section-title">
+                        <i class="fas fa-truck"></i> Estado de Flota
+                    </div>
+                    <div id="trucks-list"></div>
+                </div>
+
+                <div class="tab-panel" id="orders-panel">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number" id="pending-orders">0</div>
+                            <div class="stat-label">Pendientes</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="urgent-orders">0</div>
+                            <div class="stat-label">Urgentes</div>
+                        </div>
+                    </div>
+                    
+                    <div class="section-title">
+                        <i class="fas fa-clipboard-list"></i> Lista de Pedidos
+                    </div>
+                    <div id="orders-list"></div>
+                </div>
+
+                <div class="tab-panel" id="commands-panel">
+                    <div class="section-title">
+                        <i class="fas fa-terminal"></i> Comandos MQTT
+                    </div>
+                    
+                    <div class="mqtt-section">
+                        <h4>Tópicos Activos:</h4>
+                        <div class="mqtt-command">logistica/ubicacion/camion_1</div>
+                        <div class="mqtt-command">logistica/ubicacion/camion_2</div>
+                        <div class="mqtt-command">logistica/ubicacion/camion_3</div>
+                        <div class="mqtt-command">logistica/pedidos</div>
+                    </div>
+
+                    <div class="mqtt-section">
+                        <h4>Mensajes MQTT Recibidos:</h4>
+                        <div id="mqtt-messages"></div>
+                    </div>
+
+                    <div class="mqtt-section">
+                        <h4>Comandos Disponibles (Próximamente):</h4>
+                        <button class="mqtt-command" disabled>Solicitar Estado General</button>
+                        <button class="mqtt-command" disabled>Actualizar Ubicaciones</button>
+                        <button class="mqtt-command" disabled>Refrescar Pedidos</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-panel about-us-link" style="text-align: center;">
+                <a href="#" id="open-about-us" style="color: #667eea; text-decoration: none;">Acerca de Nosotros</a>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="status-bar">
+                <div class="status-item">
+                    <i class="fas fa-wifi status-icon" id="connection-icon" style="color: #dc3545;"></i>
+                    <span id="connection-status">Desconectado</span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-clock status-icon" style="color: #17a2b8;"></i>
+                    <span id="current-time"></span>
+                </div>
+            </div>
+            <div id="map"></div>
+
+            <div id="about-us">
+                <span class="close-btn" onclick="toggleAboutUs()">×</span>
+                <h2>Acerca de SYNKRO</h2>
+                <p>
+                    SYNKRO es una empresa líder en el desarrollo de soluciones de IoT e Industria 4.0 en Latinoamérica. Nos especializamos en la optimización de procesos logísticos, gestión de flotas y monitoreo de activos, transformando datos en inteligencia de negocio.
+                </p>
+                <p>
+                    Nuestra plataforma avanzada integra dispositivos, redes y software para ofrecer una visión en tiempo real de toda su operación. Con tecnología de vanguardia y un equipo de expertos, ayudamos a nuestros clientes a alcanzar la máxima eficiencia, reducir costos y mejorar la toma de decisiones.
+                </p>
+                <p>
+                    SYNKRO: Conectando el futuro, hoy.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let trucksData = {};
+        let ordersData = [];
+        let statsData = { pending_orders: 0, completed_deliveries: 0, trucks_in_transit: 0 };
+        let mqttMessages = [];
+        let expandedTrucks = [];
+        let truckMarkers = {};
+        let destinationMarkers = {};
+        let routeLines = {};
+
+        const map = L.map('map', { zoomControl: false }).setView([-31.4173, -64.1833], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        const truckIcon = L.divIcon({
+            className: 'truck-marker',
+            html: '<i class="fas fa-truck" style="color: #28a745; font-size: 20px;"></i>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+
+        const destinationIcon = L.divIcon({
+            className: 'destination-marker',
+            html: '<i class="fas fa-map-marker-alt" style="color: #dc3545; font-size: 24px;"></i>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 30]
+        });
+
+        const warehouseIcon = L.divIcon({
+            className: 'warehouse-marker',
+            html: '<i class="fas fa-warehouse" style="color: #6f42c1; font-size: 20px;"></i>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+
+        L.marker([-31.4173, -64.1833], {icon: warehouseIcon})
+            .addTo(map)
+            .bindPopup('<b>Centro de Distribución</b><br>Coordenadas: -31.4173, -64.1833');
+
+        const socket = io('https://webapp.synkroarg.work', {
+            path: '/socket.io',
+            transports: ['websocket', 'polling']
+        });
+
+        socket.on('connect', () => {
+            console.log('✅ Conectado a SocketIO');
+            document.getElementById('connection-status').textContent = 'Conectado';
+            document.getElementById('connection-icon').style.color = '#28a745';
+        });
+
+        socket.on('disconnect', () => {
+            console.log('❌ Desconectado de SocketIO');
+            document.getElementById('connection-status').textContent = 'Desconectado';
+            document.getElementById('connection-icon').style.color = '#dc3545';
+        });
+
+        socket.on('mqtt_message', (data) => {
+            console.log('📩 Mensaje MQTT recibido:', data);
+            const topic = data.camion_id ? `logistica/ubicacion/${data.camion_id}` : 'logistica/pedidos';
+            mqttMessages.unshift({
+                topic: topic,
+                timestamp: new Date().toLocaleString('es-AR'),
+                payload: JSON.stringify(data, null, 2)
+            });
+            if (mqttMessages.length > 50) mqttMessages.pop();
+            updateMQTTMessages();
+
+            if (data.camion_id) {
+                trucksData[data.camion_id] = data;
+                updateTruckOnMap(data.camion_id);
+                updateTrucksList();
+            } else if (data.pedidos_pendientes !== undefined) {
+                ordersData = data.lista_pedidos || [];
+                statsData.pending_orders = data.pedidos_pendientes;
+                statsData.completed_deliveries = data.entregas_realizadas || 0; // Ajustado según los datos recibidos
+                statsData.trucks_in_transit = Object.values(trucksData).filter(t => t.estado === 'en_viaje').length;
+                updateOrdersList();
+                updateTrucksList();
+            }
+        });
+
+        function updateMQTTMessages() {
+            const container = document.getElementById('mqtt-messages');
+            container.innerHTML = '';
+            mqttMessages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = 'mqtt-message';
+                div.innerHTML = `
+                    <div class="timestamp">${msg.timestamp}</div>
+                    <div class="topic">${msg.topic}</div>
+                    <div class="payload">${msg.payload}</div>
+                `;
+                container.appendChild(div);
+            });
+            console.log('📬 Mensajes MQTT actualizados:', mqttMessages.length);
+        }
+
+        function updateTruckOnMap(truckId) {
+            const truck = trucksData[truckId];
+            if (!truck) {
+                console.warn(`⚠️ Camión ${truckId} no encontrado en trucksData`);
+                return;
+            }
+
+            console.log(`🗺️ Procesando camión ${truckId}: estado=${truck.estado}, destino=${truck.destino_nombre || 'N/A'}, destino_lat=${truck.destino_lat}, destino_lon=${truck.destino_lon}`);
+
+            if (!truckMarkers[truckId]) {
+                truckMarkers[truckId] = L.marker([truck.latitud, truck.longitud], {icon: truckIcon})
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="text-align: center;">
+                            <h4><i class="fas fa-truck"></i> ${truck.camion_id.toUpperCase()}</h4>
+                            <p><strong>Estado:</strong> ${truck.estado}</p>
+                            <p><strong>Cliente:</strong> ${truck.cliente || 'N/A'}</p>
+                            <p><strong>Velocidad:</strong> ${truck.velocidad_kmh || 0} km/h</p>
+                        </div>
+                    `);
+                console.log(`🗺️ Creado marcador para ${truckId}`);
+            } else {
+                truckMarkers[truckId].setLatLng([truck.latitud, truck.longitud]);
+                truckMarkers[truckId].setPopupContent(`
+                    <div style="text-align: center;">
+                        <h4><i class="fas fa-truck"></i> ${truck.camion_id.toUpperCase()}</h4>
+                        <p><strong>Estado:</strong> ${truck.estado}</p>
+                        <p><strong>Cliente:</strong> ${truck.cliente || 'N/A'}</p>
+                        <p><strong>Velocidad:</strong> ${truck.velocidad_kmh || 0} km/h</p>
+                    </div>
+                `);
+                console.log(`🗺️ Actualizado marcador y popup para ${truckId} a [${truck.latitud}, ${truck.longitud}]`);
+            }
+
+            if (truck.destino_lat && truck.destino_lon && truck.estado !== "en_base") {
+                if (!destinationMarkers[truckId]) {
+                    destinationMarkers[truckId] = L.marker([truck.destino_lat, truck.destino_lon], {icon: destinationIcon})
+                        .addTo(map)
+                        .bindPopup(`
+                            <div style="text-align: center;">
+                                <h4><i class="fas fa-map-marker-alt"></i> Destino</h4>
+                                <p><strong>${truck.destino_nombre || 'N/A'}</strong></p>
+                                <p>Pedido: ${truck.orden_actual || 'N/A'}</p>
+                            </div>
+                        `);
+                    console.log(`📍 Creado marcador destino para ${truckId} en [${truck.destino_lat}, ${truck.destino_lon}]`);
+                } else {
+                    destinationMarkers[truckId].setLatLng([truck.destino_lat, truck.destino_lon]);
+                    destinationMarkers[truckId].setPopupContent(`
+                        <div style="text-align: center;">
+                            <h4><i class="fas fa-map-marker-alt"></i> Destino</h4>
+                            <p><strong>${truck.destino_nombre || 'N/A'}</strong></p>
+                            <p>Pedido: ${truck.orden_actual || 'N/A'}</p>
+                        </div>
+                    `);
+                    console.log(`📍 Actualizado marcador destino para ${truckId} a [${truck.destino_lat}, ${truck.destino_lon}]`);
+                }
+
+                if (routeLines[truckId]) {
+                    map.removeLayer(routeLines[truckId]);
+                }
+                routeLines[truckId] = L.polyline([
+                    [truck.latitud, truck.longitud],
+                    [truck.destino_lat, truck.destino_lon]
+                ], {
+                    color: '#007bff',
+                    weight: 3,
+                    opacity: 0.7,
+                    dashArray: '10, 10'
+                }).addTo(map);
+                console.log(`➡️ Nueva línea de ruta agregada para ${truckId}`);
+            } else {
+                if (destinationMarkers[truckId]) {
+                    map.removeLayer(destinationMarkers[truckId]);
+                    delete destinationMarkers[truckId];
+                    console.log(`🗑️ Eliminado marcador destino para ${truckId}`);
+                }
+                if (routeLines[truckId]) {
+                    map.removeLayer(routeLines[truckId]);
+                    delete routeLines[truckId];
+                    console.log(`🗑️ Eliminada línea de ruta para ${truckId}`);
+                }
+            }
+        }
+
+        function updateTrucksList() {
+            const container = document.getElementById('trucks-list');
+            container.innerHTML = '';
+
+            Object.values(trucksData).forEach(truck => {
+                const isExpanded = expandedTrucks.includes(truck.camion_id) ? 'expanded' : '';
+                const card = document.createElement('div');
+                card.className = `truck-card ${isExpanded}`;
+                card.innerHTML = `
+                    <div class="truck-header ${truck.estado}" onclick="toggleTruckDetails('${truck.camion_id}')">
+                        <div class="truck-info">
+                            <div class="truck-id">
+                                <i class="fas fa-truck"></i> ${truck.camion_id.toUpperCase()}
+                            </div>
+                            <div class="truck-status">${getStatusText(truck.estado)}</div>
+                        </div>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="truck-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Cliente:</span>
+                            <span class="detail-value">${truck.cliente || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Pedido:</span>
+                            <span class="detail-value">${truck.orden_actual || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Destino:</span>
+                            <span class="detail-value">${truck.destino_nombre || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Coordenadas:</span>
+                            <span class="detail-value">${truck.latitud.toFixed(4)}, ${truck.longitud.toFixed(4)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Velocidad:</span>
+                            <span class="detail-value">${truck.velocidad_kmh || 0} km/h</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Distancia:</span>
+                            <span class="detail-value">${truck.distancia_total.toFixed(2) || 0} km</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Entregas:</span>
+                            <span class="detail-value">${truck.entregas_realizadas || 0}</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            document.getElementById('active-trucks').textContent = Object.keys(trucksData).length;
+            document.getElementById('total-deliveries').textContent = 
+                Object.values(trucksData).reduce((sum, truck) => sum + (truck.entregas_realizadas || 0), 0);
+            console.log('📑 Lista de camiones actualizada, total:', Object.keys(trucksData).length);
+        }
+
+        function updateOrdersList() {
+            const container = document.getElementById('orders-list');
+            container.innerHTML = '';
+
+            ordersData.forEach(order => {
+                const priority = order.prioridad || 'normal'; // Asumimos 'normal' si no hay prioridad
+                const item = document.createElement('div');
+                item.className = `order-item ${priority}`;
+                item.innerHTML = `
+                    <div class="order-header">
+                        <div class="order-id">${order.pedido_id || 'N/A'}</div>
+                        <div class="priority-badge ${priority}">${priority}</div>
+                    </div>
+                    <div style="color: #6c757d; margin-bottom: 5px;">
+                        <i class="fas fa-user"></i> ${order.cliente || 'N/A'}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                        <span><i class="fas fa-weight-hanging"></i> ${order.peso_kg || 0} kg</span>
+                        <span><i class="fas fa-clock"></i> ${new Date(order.timestamp * 1000).toLocaleString('es-AR') || 'N/A'}</span>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+
+            document.getElementById('pending-orders').textContent = statsData.pending_orders;
+            document.getElementById('urgent-orders').textContent = 
+                ordersData.filter(order => order.prioridad === 'urgente').length;
+            console.log('📋 Lista de pedidos actualizada, total:', ordersData.length);
+        }
+
+        function getStatusText(estado) {
+            switch(estado) {
+                case 'en_viaje': return 'En Viaje';
+                case 'cargando': return 'Cargando';
+                case 'entregado': return 'Entregado';
+                case 'regresando': return 'Regresando';
+                case 'en_base': return 'En Base';
+                default: return estado;
+            }
+        }
+
+        function toggleTruckDetails(truckId) {
+            if (expandedTrucks.includes(truckId)) {
+                expandedTrucks = expandedTrucks.filter(id => id !== truckId);
+            } else {
+                expandedTrucks = [truckId]; // Solo un camión abierto a la vez
+            }
+            updateTrucksList();
+            console.log(`🔍 Toggling detalles de ${truckId}, expandedTrucks:`, expandedTrucks);
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+            document.getElementById(`${tabName}-panel`).classList.add('active');
+            console.log(`📑 Cambiando a tab ${tabName}`);
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function toggleAboutUs() {
+            document.getElementById('about-us').classList.toggle('active');
+            console.log('📜 Toggling Acerca de Nosotros');
+        }
+
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = 
+                now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        window.addEventListener('load', () => {
+            updateTrucksList();
+            updateOrdersList();
+            updateTime();
+            setInterval(updateTime, 1000);
+            checkResponsive();
+            window.addEventListener('resize', checkResponsive);
+            console.log('🚀 App inicializada');
+            document.getElementById('open-about-us').addEventListener('click', toggleAboutUs);
+        });
+
+        function checkResponsive() {
+            const menuToggle = document.querySelector('.menu-toggle');
+            if (window.innerWidth <= 768) {
+                menuToggle.style.display = 'block';
+            } else {
+                menuToggle.style.display = 'none';
+                document.getElementById('sidebar').classList.remove('open');
+            }
+        }
+
+         if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registrado con éxito:', registration);
+                    })
+                    .catch(err => {
+                        console.log('Fallo el registro del Service Worker:', err);
+                    });
+            });
+        }
+    </script> 
+</body>
+</html>

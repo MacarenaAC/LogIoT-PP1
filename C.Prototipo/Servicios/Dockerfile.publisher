@@ -1,0 +1,15 @@
+# Usa una imagen oficial de Python como base
+FROM python:3.9-slim
+
+# Establece el directorio de trabajo
+WORKDIR /app
+
+# Copia e instala las dependencias desde requirements.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copia el script de Python
+COPY publicador_ubicacion.py .
+
+# Ejecuta el script cuando el contenedor inicie
+CMD ["python", "publicador_ubicacion.py"]

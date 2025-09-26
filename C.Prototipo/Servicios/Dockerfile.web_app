@@ -1,0 +1,20 @@
+# Usa una imagen base de Python
+FROM python:3.9-slim
+
+# Establece el directorio de trabajo en /app dentro del contenedor
+WORKDIR /app
+
+# Copia los archivos de requerimientos y los instala
+COPY requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copia el código de la aplicación y la carpeta de plantillas
+
+COPY app.py .
+COPY templates ./templates
+
+# Expone el puerto que la aplicación Flask usará
+EXPOSE 5000
+
+# Comando para ejecutar la aplicación
+CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "--bind", "0.0.0.0:5000", "app:app"]

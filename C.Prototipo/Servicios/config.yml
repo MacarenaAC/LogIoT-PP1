@@ -1,0 +1,17 @@
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  # Regla para el broker MQTT
+  - hostname: "mqtt.synkroarg.work"
+    service: tcp://mosquitto_proyecto:1883 
+    
+
+  - hostname: "mqttws.synkroarg.work"
+    service: http://mosquitto_proyecto:9001  # Mapeamos el tráfico HTTP de WebSocket a Mosquitto
+
+  #  HTTP/HTTPS a NPM
+  - hostname: "*.synkroarg.work"
+    service: http://npm_proyecto:80
+  
+  # Regla por defecto si nada más coincide
+  - service: http_status:404

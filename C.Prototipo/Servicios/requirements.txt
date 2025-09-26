@@ -1,0 +1,8 @@
+paho-mqtt==1.6.1
+Flask
+Flask-MQTT==1.2.1
+Flask-SocketIO==5.3.6
+gunicorn==22.0.0
+eventlet==0.36.1
+uvicorn
+psycopg2-binary
