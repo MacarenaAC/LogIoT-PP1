@@ -61,6 +61,30 @@ services:
       - mosquitto
       - influxdb
 
+  # Otro contenedor Telegraf para AWS IoT
+  telegraf_aws:
+    build:
+      context: .
+      dockerfile: Dockerfile.telegraf
+    container_name: telegraf_aws_proyecto
+    restart: unless-stopped
+    environment:
+      - INFLUX_TOKEN=${INFLUX_TOKEN}
+      - INFLUX_ORG=${INFLUX_ORG}
+      - INFLUX_BUCKET=${INFLUX_BUCKET}
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      # Los certificados ya se copian en el Dockerfile
+    networks:
+      - proyecto_network
+    depends_on:
+      - influxdb_proyecto
+    healthcheck:
+      test: ["CMD", "telegraf", "--test", "--config", "/etc/telegraf/telegraf.conf"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   grafana:
     image: grafana/grafana:latest
     container_name: grafana_proyecto
