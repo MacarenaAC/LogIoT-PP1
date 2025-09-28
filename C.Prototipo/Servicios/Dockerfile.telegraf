@@ -5,8 +5,8 @@ RUN mkdir -p /certificates
 
 # Copiar certificados AWS IoT al contenedor
 COPY ../Certificados/AmazonRootCA1.pem /certificates/AmazonRootCA1.pem
-COPY ../Certificados/7dae54a14bb86767cbbccabfb3bfc97c5472f994efe55986c4c771643da83589-certificate.pem.crt /certificates/device-certificate.pem.crt
-COPY ../Certificados/49f195f1bccce839bdb80fd0a0b52e28cc5d1fbce516d8380f78c0c2506abfe7-private.pem.key /certificates/private.pem.key
+COPY ../Certificados/Grupo1-certificate.pem.crt /certificates/device-certificate.pem.crt
+COPY ../Certificados/Grupo1-private.pem.key /certificates/private.pem.key
 
 # Establecer permisos correctos para los certificados
 RUN chmod 644 /certificates/*.pem && chmod 600 /certificates/private.pem.key
