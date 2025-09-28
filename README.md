@@ -1,4 +1,4 @@
-[caratula](./E.Assets/caratula.png)
+![caratula](./E.Assets/caratula.png)
 
 # LogIoT
 
@@ -55,7 +55,7 @@ EL proyecto consta del dispositivo enbebido con su sistema de sensores y comunic
 
 [Link a la imagen de la arquitectura](https://app.mockflow.com/view/Me4316fdf3900cd8de0bcddee3768765f1758825242472)
 
-[arquitectura](./E.Assets/arquitectura.png)
+![arquitectura](./E.Assets/arquitectura.png)
 
 -----------
 
