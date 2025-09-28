@@ -72,13 +72,15 @@ services:
       - INFLUX_TOKEN=${INFLUX_TOKEN}
       - INFLUX_ORG=${INFLUX_ORG}
       - INFLUX_BUCKET=${INFLUX_BUCKET}
+      - AWS_IOT_ENDPOINT=${AWS_IOT_ENDPOINT}
+      - AWS_IOT_PORT=${AWS_IOT_PORT}
     volumes:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
       # Los certificados ya se copian en el Dockerfile
     networks:
-      - proyecto_network
+      - proyecto_iot_net
     depends_on:
-      - influxdb_proyecto
+      - influxdb
     healthcheck:
       test: ["CMD", "telegraf", "--test", "--config", "/etc/telegraf/telegraf.conf"]
       interval: 30s

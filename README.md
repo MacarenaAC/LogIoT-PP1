@@ -26,16 +26,23 @@ EL proyecto consta del dispositivo enbebido con su sistema de sensores y comunic
 
 -----------
 
- Stack Tecnologico:
- - Base de datos:
-    - 
-    - PostGIS (A futuro)
- - Broker:
-    - DEV: mosquitto (docker)
-    - PROD: AWS IoT CORE
-- Visualizacion:
-    - Grafana (docker)
-    - WebApp (docker)
+### Stack Tecnologico:
+
+- Backend (docker)
+    - Mosquitto: Broker MQTT local (puertos 1883, 9001)
+    - Web App: Flask + SocketIO para dashboard web
+    - InfluxDB: Base de datos de series temporales
+    - Grafana: Dashboards y visualización
+    - Telegraf: 2 instancias
+    - telegraf: Broker local Mosquitto (comentado)
+    - telegraf_aws: AWS IoT Core con certificados SSL
+    - PostGIS: Base de datos geoespacial
+    - Geoproc App: Procesamiento geoespacial
+    - Publisher: Simulador de camiones
+    - Node-RED: Flujo de datos
+    - NPM: Proxy reverso
+    - Cloudflare Tunnel: Acceso externo
+
 - Dispositivo Embebido:
     - ESP32
     - MOdulo GPS
@@ -44,6 +51,31 @@ EL proyecto consta del dispositivo enbebido con su sistema de sensores y comunic
 
 -----------
 
-Arquitectura de red:
+### Arquitectura de red:
 
 [en-proceso](https://app.mockflow.com/view/Me4316fdf3900cd8de0bcddee3768765f1758825242472)
+
+[arquitectura](./E.Assets/arquitectura.png)
+
+-----------
+
+### Flujos de Datos
+
+**Producción (AWS IoT Core)**
+
+ESP8266 → AWS IoT Core → Telegraf AWS → InfluxDB → Grafana
+                    ↓
+                Web App (app.py) → Dashboard Web
+
+**Desarrollo/Testing (Mosquitto local)**
+
+Publisher → Mosquitto → Telegraf (comentado) → InfluxDB
+                    ↓
+                Web App → Dashboard Web
+
+-----------
+
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/

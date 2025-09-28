@@ -39,7 +39,7 @@ const int AWS_IOT_PORT = 8883;
 const char* THING_NAME = "Grupo1_logiot";  // Tu Thing Name en AWS IoT
 
 // ID único del dispositivo
-const char* DEVICE_ID = "ESP32-CAMION_01";  
+const char* DEVICE_ID = "ESP-32-CAMION_01";  
 
 // Nuevos topics para AWS IoT siguiendo el patrón solicitado
 const char* AWS_TOPIC_UBICACION = "logistica/ubicacion/ESP-32-CAMION_01";  // Tracking en tiempo real
@@ -400,16 +400,14 @@ void configurarAWS() {
   lcd.setCursor(0, 0);
   lcd.print("Config AWS IoT...");
   
-  // Configurar certificados
-  wifiClientSecure.setCACert(AWS_CERT_CA);
-  wifiClientSecure.setCertificate(AWS_CERT_CRT);
-  wifiClientSecure.setPrivateKey(AWS_CERT_PRIVATE);
+  // Configurar SSL en modo inseguro (sin validación de certificados)
+  wifiClientSecure.setInsecure();
   
   // Configurar cliente MQTT
   awsClient.setServer(AWS_IOT_ENDPOINT, AWS_IOT_PORT);
   awsClient.setCallback(callbackMQTT);
   
-  Serial.println("✔ AWS IoT configurado");
+  Serial.println("✔ AWS IoT configurado (modo inseguro)");
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("AWS: Configurado");
@@ -494,7 +492,7 @@ void callbackMQTT(char* topic, byte* payload, unsigned int length) {
   
   // Convertir payload a string
   String message = "";
-  for (int i = 0; i < length; i++) {
+  for (unsigned int i = 0; i < length; i++) {
     message += (char)payload[i];
   }
   
@@ -721,21 +719,24 @@ void publicarGPS() {
 void publicarDiagnostico() {
   
   StaticJsonDocument<256> doc;
-  doc["vehiculo_id"] = MQTT_CLIENTE_ID;
+  doc["device_id"] = DEVICE_ID;
   doc["estado_wifi"] = (WiFi.status() == WL_CONNECTED) ? "Conectado" : "Desconectado";
-  doc["estado_mqtt"] = clienteMQTT.isConnected() ? "Conectado" : "Desconectado";
+  doc["estado_mqtt"] = awsClient.connected() ? "Conectado" : "Desconectado";
   doc["estado_gps"] = (gps.satellites.isValid() && gps.satellites.value() >= 3) ? "Señal OK" : "Sin señal";
   doc["satelites_gps"] = gps.satellites.value();
+  doc["timestamp"] = millis();
 
   char buffer[256];
   serializeJson(doc, buffer);
   
-  if (clienteMQTT.isConnected()) {
-    if (clienteMQTT.publish(MQTT_TOPICO_INFO, buffer, false, 1)) {
-      Serial.printf("Diagnóstico publicado -> %s\n", buffer);
+  if (awsClient.connected()) {
+    if (awsClient.publish(AWS_TOPIC_INFO, buffer)) {
+      Serial.printf("Diagnóstico publicado en AWS -> %s\n", buffer);
     } else {
-      Serial.println("Fallo al publicar diagnóstico");
+      Serial.println("Fallo al publicar diagnóstico en AWS IoT");
     }
+  } else {
+    Serial.println("No se publica diagnóstico: AWS IoT desconectado");
   }
 }
 
@@ -890,7 +891,7 @@ void mostrarDashboard() {
   
   lcd.setCursor(0, 1);
   lcd.print("MQTT: ");
-  lcd.print(clienteMQTT.isConnected() ? "OK" : "NO");
+  lcd.print(awsClient.connected() ? "OK" : "NO");
 
   lcd.setCursor(0, 2);
   lcd.print("Lat:");
