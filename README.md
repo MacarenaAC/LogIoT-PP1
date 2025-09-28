@@ -1,4 +1,4 @@
-[caratula](E.Assets/caratula.png)
+[caratula](./E.Assets/caratula.png)
 
 # LogIoT
 
@@ -16,13 +16,13 @@ EL proyecto consta del dispositivo enbebido con su sistema de sensores y comunic
 **Profesor:** Violi, Dante
 
 **Integrantes:**
- - Lisandro Juncos          | https://github.com/Lisandro-05
- - Macarena Carballo        | https://github.com/MacarenaAC
- - Raul Jara                | https://github.com/r-j28
- - Luciano Lujan            | https://github.com/lucianoilujan
- - Fernando Gimenez Coria   | https://github.com/FerCbr
- - Vittorio Durigutti       | https://github.com/vittoriodurigutti
- - Ares	Diego               | 
+ - Lisandro Juncos                   | https://github.com/Lisandro-05
+ - Macarena Carballo [Scrum Master]  | https://github.com/MacarenaAC
+ - Raul Jara                         | https://github.com/r-j28
+ - Luciano Lujan [Prouduct Owner]    | https://github.com/lucianoilujan
+ - Fernando Gimenez Coria            | https://github.com/FerCbr
+ - Vittorio Durigutti                | https://github.com/vittoriodurigutti
+ - Ares	Diego                        | 
 
 -----------
 
@@ -53,7 +53,7 @@ EL proyecto consta del dispositivo enbebido con su sistema de sensores y comunic
 
 ### Arquitectura de red:
 
-[en-proceso](https://app.mockflow.com/view/Me4316fdf3900cd8de0bcddee3768765f1758825242472)
+[Link a la imagen de la arquitectura](https://app.mockflow.com/view/Me4316fdf3900cd8de0bcddee3768765f1758825242472)
 
 [arquitectura](./E.Assets/arquitectura.png)
 
