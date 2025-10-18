@@ -9,7 +9,6 @@ COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copia el código de la aplicación y la carpeta de plantillas
-
 COPY app.py .
 COPY templates ./templates
 

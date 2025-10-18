@@ -1,0 +1,15 @@
+FROM telegraf:1.30
+
+# Crear directorio para certificados
+RUN mkdir -p /certificates
+
+# Copiar certificados AWS IoT al contenedor
+COPY certificates/AmazonRootCA1.pem /certificates/AmazonRootCA1.pem
+COPY certificates/Grupo1-certificate.pem.crt /certificates/device-certificate.pem.crt
+COPY certificates/Grupo1-private.pem.key /certificates/private.pem.key
+
+# Establecer permisos correctos para los certificados
+RUN chmod 644 /certificates/*.pem && chmod 600 /certificates/private.pem.key
+
+# Copiar configuración
+COPY telegraf/telegraf.conf /etc/telegraf/telegraf.conf
