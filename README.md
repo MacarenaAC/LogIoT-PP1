@@ -22,7 +22,7 @@ EL proyecto consta del dispositivo enbebido con su sistema de sensores y comunic
  - Luciano Lujan [Prouduct Owner]    | https://github.com/lucianoilujan
  - Fernando Gimenez Coria            | https://github.com/FerCbr
  - Vittorio Durigutti                | https://github.com/vittoriodurigutti
- - Ares	Diego                        | 
+ - Ares	Diego                        | https://github.com/diegote7
 
 -----------
 
