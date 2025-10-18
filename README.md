@@ -9,7 +9,7 @@
 Como parte del TP numero 2, seleccionamos el proyecto comenzado por Luciano.
 El mismos consta de un sistema de logistica via GPS para localizacion, automatizacion de recorridos, seguimiento y metrica de elementos moviles como AGV o vehiculos automatizables.
 
-EL proyecto consta del dispositivo enbebido con su sistema de sensores y comunicacion. Backend para comunincacion con base de datos y sistemas de visualizacion como grafana. Y aplicacion WEB para seguimiento, control y debug de los dispositivos desplegados.
+EL proyecto consta del dispositivo enbebido con su sistema de sensores y comunicacion. Backend para comunincacion con base de datos y sistemas de visualizacion como Grafana. Y aplicacion WEB para seguimiento, control y debug de los dispositivos desplegados.
 
 -----------
 
