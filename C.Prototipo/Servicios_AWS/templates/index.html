@@ -113,8 +113,8 @@
             background: #f8f9fa;
         }
 
-        .truck-header.en_viaje {
-            background: linear-gradient(135deg, #28a745, #20c997);
+        .truck-header.en_viaje, .truck-header.low-precision {
+            background: linear-gradient(135deg, #17a2b8, #6610f2);
             color: white;
         }
 
@@ -476,6 +476,9 @@
                 <button class="nav-tab active" onclick="switchTab('trucks')">
                     <i class="fas fa-truck"></i> Flota
                 </button>
+                <button class="nav-tab" onclick="switchTab('iot-fleet')">
+                   <i class="fas fa-microchip"></i> IoT Fleet
+                </button>
                 <button class="nav-tab" onclick="switchTab('orders')">
                     <i class="fas fa-box"></i> Pedidos
                 </button>
@@ -502,6 +505,17 @@
                     </div>
                     <div id="trucks-list"></div>
                 </div>
+
+                <div class="tab-panel active" id="trucks-panel">
+                   </div>
+                <div class="tab-panel" id="iot-fleet-panel">
+                    <div class="section-title">
+                         <i class="fas fa-microchip"></i> Dispositivos IoT Activos
+                    </div>
+                     <div id="iot-devices-list">
+                      </div>
+                 </div>
+
 
                 <div class="tab-panel" id="orders-panel">
                     <div class="stats-grid">
@@ -585,6 +599,8 @@
     <script>
         let trucksData = {};
         let ordersData = [];
+        let iotFleetData = {};
+        let iotMarkers = {};
         let statsData = { pending_orders: 0, completed_deliveries: 0, trucks_in_transit: 0 };
         let mqttMessages = [];
         let expandedTrucks = [];
@@ -596,6 +612,13 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
+
+        const iotIcon = L.divIcon({ 
+            className: 'iot-marker',
+            html: '<i class="fas fa-satellite-dish" style="color: #667eea; font-size: 18px;"></i>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
 
         const truckIcon = L.divIcon({
             className: 'truck-marker',
@@ -628,20 +651,23 @@
         });
 
         socket.on('connect', () => {
-            console.log('✅ Conectado a SocketIO');
+            console.log(' Conectado a SocketIO');
             document.getElementById('connection-status').textContent = 'Conectado';
             document.getElementById('connection-icon').style.color = '#28a745';
         });
 
         socket.on('disconnect', () => {
-            console.log('❌ Desconectado de SocketIO');
+            console.log(' Desconectado de SocketIO');
             document.getElementById('connection-status').textContent = 'Desconectado';
             document.getElementById('connection-icon').style.color = '#dc3545';
         });
 
+
         socket.on('mqtt_message', (data) => {
-            console.log('📩 Mensaje MQTT recibido:', data);
-            const topic = data.camion_id ? `logistica/ubicacion/${data.camion_id}` : 'logistica/pedidos';
+            console.log('Mensaje MQTT recibido:', data);
+            const topic = data.camion_id ? `logistica/ubicacion/${data.camion_id}` : 
+                          data.device_id ? `logistica/ubicacion/${data.device_id}` : 
+                          'logistica/pedidos';
             mqttMessages.unshift({
                 topic: topic,
                 timestamp: new Date().toLocaleString('es-AR'),
@@ -654,15 +680,100 @@
                 trucksData[data.camion_id] = data;
                 updateTruckOnMap(data.camion_id);
                 updateTrucksList();
+            } else if (data.device_id && data.latitud && data.longitud) {
+                iotFleetData[data.device_id] = data;
+                updateIotDeviceOnMap(data.device_id);
+                updateIotDevicesList();
             } else if (data.pedidos_pendientes !== undefined) {
                 ordersData = data.lista_pedidos || [];
                 statsData.pending_orders = data.pedidos_pendientes;
-                statsData.completed_deliveries = data.entregas_realizadas || 0; // Ajustado según los datos recibidos
+                statsData.completed_deliveries = data.entregas_realizadas || 0;
                 statsData.trucks_in_transit = Object.values(trucksData).filter(t => t.estado === 'en_viaje').length;
                 updateOrdersList();
                 updateTrucksList();
             }
         });
+
+        function updateIotDeviceOnMap(deviceId) {
+            const device = iotFleetData[deviceId];
+            if (!device) {
+                console.warn(` Dispositivo ${deviceId} no encontrado en iotFleetData`);
+                return;
+            }
+
+            console.log(` Procesando dispositivo IoT ${deviceId}: Lat=${device.latitud}, Lon=${device.longitud}`);
+
+            if (!iotMarkers[deviceId]) {
+                // Crea el marcador si no existe
+                iotMarkers[deviceId] = L.marker([device.latitud, device.longitud], {icon: iotIcon})
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="text-align: center;">
+                            <h4><i class="fas fa-satellite-dish"></i> ${deviceId}</h4>
+                            <p><strong>Lat/Lon:</strong> ${device.latitud.toFixed(4)}, ${device.longitud.toFixed(4)}</p>
+                            <p><strong>Velocidad:</strong> ${device.velocidad_kmh || 0} km/h</p>
+                            <p><strong>Satélites:</strong> ${device.satelites || 'N/A'}</p>
+                        </div>
+                    `);
+                console.log(` Creado marcador para IoT ${deviceId}`);
+            } else {
+                // Actualiza la posición y el popup si ya existe
+                iotMarkers[deviceId].setLatLng([device.latitud, device.longitud]);
+                iotMarkers[deviceId].setPopupContent(`
+                    <div style="text-align: center;">
+                        <h4><i class="fas fa-satellite-dish"></i> ${deviceId}</h4>
+                        <p><strong>Lat/Lon:</strong> ${device.latitud.toFixed(4)}, ${device.longitud.toFixed(4)}</p>
+                        <p><strong>Velocidad:</strong> ${device.velocidad_kmh || 0} km/h</p>
+                        <p><strong>Satélites:</strong> ${device.satelites || 'N/A'}</p>
+                    </div>
+                `);
+                console.log(`Actualizado marcador IoT ${deviceId} a [${device.latitud}, ${device.longitud}]`);
+            }
+        }
+
+        function updateIotDevicesList() {
+            const container = document.getElementById('iot-devices-list');
+            container.innerHTML = '';
+
+            Object.values(iotFleetData).forEach(device => {
+                const isLowPrecision = device.precision_baja === true;
+                const card = document.createElement('div');
+                card.className = `truck-card ${isLowPrecision ? 'low-precision' : ''}`;
+                card.style.cursor = 'default'; // Estilo para que se parezca a truck-card
+                
+                card.innerHTML = `
+                    <div class="truck-header ${isLowPrecision ? 'cargando' : 'en_viaje'}" style="cursor: default;">
+                        <div class="truck-info">
+                            <div class="truck-id">
+                                <i class="fas fa-satellite-dish"></i> ${device.device_id}
+                            </div>
+                            <div class="truck-status">${isLowPrecision ? 'Baja Precisión' : 'Alta Precisión'}</div>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div class="truck-details" style="max-height: 400px; padding: 15px;">
+                        <div class="detail-row">
+                            <span class="detail-label">Coordenadas:</span>
+                            <span class="detail-value">${device.latitud.toFixed(6)}, ${device.longitud.toFixed(6)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Velocidad:</span>
+                            <span class="detail-value">${(device.velocidad_kmh || 0).toFixed(1)} km/h</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Satélites:</span>
+                            <span class="detail-value">${device.satelites || 'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Timestamp:</span>
+                            <span class="detail-value">${new Date(device.timestamp).toLocaleString('es-AR')}</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            console.log(' Lista de dispositivos IoT actualizada, total:', Object.keys(iotFleetData).length);
+        }
 
         function updateMQTTMessages() {
             const container = document.getElementById('mqtt-messages');
@@ -677,17 +788,17 @@
                 `;
                 container.appendChild(div);
             });
-            console.log('📬 Mensajes MQTT actualizados:', mqttMessages.length);
+            console.log('Mensajes MQTT actualizados:', mqttMessages.length);
         }
 
         function updateTruckOnMap(truckId) {
             const truck = trucksData[truckId];
             if (!truck) {
-                console.warn(`⚠️ Camión ${truckId} no encontrado en trucksData`);
+                console.warn(`Camión ${truckId} no encontrado en trucksData`);
                 return;
             }
 
-            console.log(`🗺️ Procesando camión ${truckId}: estado=${truck.estado}, destino=${truck.destino_nombre || 'N/A'}, destino_lat=${truck.destino_lat}, destino_lon=${truck.destino_lon}`);
+            console.log(`Procesando camión ${truckId}: estado=${truck.estado}, destino=${truck.destino_nombre || 'N/A'}, destino_lat=${truck.destino_lat}, destino_lon=${truck.destino_lon}`);
 
             if (!truckMarkers[truckId]) {
                 truckMarkers[truckId] = L.marker([truck.latitud, truck.longitud], {icon: truckIcon})
@@ -700,7 +811,7 @@
                             <p><strong>Velocidad:</strong> ${truck.velocidad_kmh || 0} km/h</p>
                         </div>
                     `);
-                console.log(`🗺️ Creado marcador para ${truckId}`);
+                console.log(`Creado marcador para ${truckId}`);
             } else {
                 truckMarkers[truckId].setLatLng([truck.latitud, truck.longitud]);
                 truckMarkers[truckId].setPopupContent(`
@@ -711,7 +822,7 @@
                         <p><strong>Velocidad:</strong> ${truck.velocidad_kmh || 0} km/h</p>
                     </div>
                 `);
-                console.log(`🗺️ Actualizado marcador y popup para ${truckId} a [${truck.latitud}, ${truck.longitud}]`);
+                console.log(`Actualizado marcador y popup para ${truckId} a [${truck.latitud}, ${truck.longitud}]`);
             }
 
             if (truck.destino_lat && truck.destino_lon && truck.estado !== "en_base") {
@@ -725,7 +836,7 @@
                                 <p>Pedido: ${truck.orden_actual || 'N/A'}</p>
                             </div>
                         `);
-                    console.log(`📍 Creado marcador destino para ${truckId} en [${truck.destino_lat}, ${truck.destino_lon}]`);
+                    console.log(`Creado marcador destino para ${truckId} en [${truck.destino_lat}, ${truck.destino_lon}]`);
                 } else {
                     destinationMarkers[truckId].setLatLng([truck.destino_lat, truck.destino_lon]);
                     destinationMarkers[truckId].setPopupContent(`
@@ -735,7 +846,7 @@
                             <p>Pedido: ${truck.orden_actual || 'N/A'}</p>
                         </div>
                     `);
-                    console.log(`📍 Actualizado marcador destino para ${truckId} a [${truck.destino_lat}, ${truck.destino_lon}]`);
+                    console.log(`Actualizado marcador destino para ${truckId} a [${truck.destino_lat}, ${truck.destino_lon}]`);
                 }
 
                 if (routeLines[truckId]) {
@@ -750,17 +861,17 @@
                     opacity: 0.7,
                     dashArray: '10, 10'
                 }).addTo(map);
-                console.log(`➡️ Nueva línea de ruta agregada para ${truckId}`);
+                console.log(`Nueva línea de ruta agregada para ${truckId}`);
             } else {
                 if (destinationMarkers[truckId]) {
                     map.removeLayer(destinationMarkers[truckId]);
                     delete destinationMarkers[truckId];
-                    console.log(`🗑️ Eliminado marcador destino para ${truckId}`);
+                    console.log(`Eliminado marcador destino para ${truckId}`);
                 }
                 if (routeLines[truckId]) {
                     map.removeLayer(routeLines[truckId]);
                     delete routeLines[truckId];
-                    console.log(`🗑️ Eliminada línea de ruta para ${truckId}`);
+                    console.log(`Eliminada línea de ruta para ${truckId}`);
                 }
             }
         }
@@ -820,7 +931,7 @@
             document.getElementById('active-trucks').textContent = Object.keys(trucksData).length;
             document.getElementById('total-deliveries').textContent = 
                 Object.values(trucksData).reduce((sum, truck) => sum + (truck.entregas_realizadas || 0), 0);
-            console.log('📑 Lista de camiones actualizada, total:', Object.keys(trucksData).length);
+            console.log('Lista de camiones actualizada, total:', Object.keys(trucksData).length);
         }
 
         function updateOrdersList() {
@@ -850,7 +961,7 @@
             document.getElementById('pending-orders').textContent = statsData.pending_orders;
             document.getElementById('urgent-orders').textContent = 
                 ordersData.filter(order => order.prioridad === 'urgente').length;
-            console.log('📋 Lista de pedidos actualizada, total:', ordersData.length);
+            console.log('Lista de pedidos actualizada, total:', ordersData.length);
         }
 
         function getStatusText(estado) {
@@ -871,7 +982,7 @@
                 expandedTrucks = [truckId]; // Solo un camión abierto a la vez
             }
             updateTrucksList();
-            console.log(`🔍 Toggling detalles de ${truckId}, expandedTrucks:`, expandedTrucks);
+            console.log(`Toggling detalles de ${truckId}, expandedTrucks:`, expandedTrucks);
         }
 
         function switchTab(tabName) {
@@ -880,7 +991,7 @@
 
             document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
             document.getElementById(`${tabName}-panel`).classList.add('active');
-            console.log(`📑 Cambiando a tab ${tabName}`);
+            console.log(`Cambiando a tab ${tabName}`);
         }
 
         function toggleSidebar() {
@@ -889,7 +1000,7 @@
 
         function toggleAboutUs() {
             document.getElementById('about-us').classList.toggle('active');
-            console.log('📜 Toggling Acerca de Nosotros');
+            console.log('Toggling Acerca de Nosotros');
         }
 
         function updateTime() {
@@ -905,7 +1016,7 @@
             setInterval(updateTime, 1000);
             checkResponsive();
             window.addEventListener('resize', checkResponsive);
-            console.log('🚀 App inicializada');
+            console.log('App inicializada');
             document.getElementById('open-about-us').addEventListener('click', toggleAboutUs);
         });
 
