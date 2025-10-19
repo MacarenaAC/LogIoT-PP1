@@ -117,3 +117,27 @@ Dispositivos IoT → AWS IoT Core → Web App (Flask)
 - El token de Grafana Cloud debe mantenerse seguro
 - Considerar usar AWS Secrets Manager para tokens sensibles
 - Configurar Security Groups en EC2 apropiadamente
+
+---------------------
+
+## Conectar con AWS EC2
+
+Comandos necesarios para conectar en Windows:
+
+```sh
+# Source: https://stackoverflow.com/a/43317244
+$path = ".\aws-ec2-key.pem"
+# Reset to remove explict permissions
+icacls.exe $path /reset
+# Give current user explicit read-permission
+icacls.exe $path /GRANT:R "$($env:USERNAME):(R)"
+# Disable inheritance and remove inherited permissions
+icacls.exe $path /inheritance:r
+```
+
+Conectar con la EC2:
+
+```sh
+scp -i .\logiot.pem .\telegraf\telegraf.conf ec2-user@ec2-13-59-117-187.us-east-2.compute.amazonaws.com:/home/ec2-user/
+```
+

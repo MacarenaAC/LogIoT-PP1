@@ -3,12 +3,12 @@ import json
 import logging
 import eventlet
 import ssl
+import threading
+import time
 from dotenv import load_dotenv  # Agregar para cargar .env
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from flask import Flask, render_template
 from flask_socketio import SocketIO
-import threading
-import time
 
 # Cargar variables de entorno
 load_dotenv()
@@ -125,8 +125,12 @@ def init_aws_iot_client():
             connection_status["error"] = error_msg
             return False
         
-        # Crear cliente AWS IoT
-        aws_iot_client = AWSIoTMQTTClient(AWS_CLIENT_ID)
+        # Crear cliente AWS IoT con configuración más robusta
+        try:
+            aws_iot_client = AWSIoTMQTTClient(AWS_CLIENT_ID, useWebsocket=False)
+        except Exception as client_error:
+            logging.error(f"Error creando cliente AWS IoT: {client_error}")
+            return False
         
         # Configurar endpoint y puerto
         aws_iot_client.configureEndpoint(AWS_IOT_ENDPOINT, AWS_IOT_PORT)
@@ -136,30 +140,42 @@ def init_aws_iot_client():
         aws_iot_client.configureCredentials(AWS_ROOT_CA_PATH, AWS_PRIVATE_KEY_PATH, AWS_CERT_PATH)
         logging.info("Certificados AWS IoT configurados desde archivos")
         
-        # Configuraciones adicionales
+        # Configuraciones adicionales más conservadoras
         aws_iot_client.configureAutoReconnectBackoffTime(1, 32, 20)
         aws_iot_client.configureOfflinePublishQueueing(-1)  # Infinite offline publish queueing
         aws_iot_client.configureDrainingFrequency(2)  # Draining: 2 Hz
         aws_iot_client.configureConnectDisconnectTimeout(10)  # 10 sec
         aws_iot_client.configureMQTTOperationTimeout(5)  # 5 sec
         
-        # Conectar
+        # Conectar con manejo de errores mejorado
         logging.info(f"Conectando a AWS IoT: {AWS_IOT_ENDPOINT}:{AWS_IOT_PORT}")
-        if aws_iot_client.connect():
-            logging.info("✅ Conectado exitosamente a AWS IoT Core")
-            connection_status["connected"] = True
-            connection_status["error"] = None
-            
-            # Suscribirse a topics
-            for topic in AWS_TOPICS:
-                logging.info(f"Suscribiéndose a topic: {topic}")
-                aws_iot_client.subscribe(topic, 1, custom_callback)
-                time.sleep(0.5)  # Pequeña pausa entre suscripciones
-            
-            logging.info(f"✅ Suscrito a todos los topics: {AWS_TOPICS}")
-            return True
-        else:
-            error_msg = "Error conectando a AWS IoT Core - falló connect()"
+        
+        # Intentar conexión con timeout
+        try:
+            connection_result = aws_iot_client.connect()
+            if connection_result:
+                logging.info("✅ Conectado exitosamente a AWS IoT Core")
+                connection_status["connected"] = True
+                connection_status["error"] = None
+                
+                # Suscribirse a topics con manejo de errores
+                for topic in AWS_TOPICS:
+                    try:
+                        logging.info(f"Suscribiéndose a topic: {topic}")
+                        aws_iot_client.subscribe(topic, 1, custom_callback)
+                        time.sleep(0.5)  # Pequeña pausa entre suscripciones
+                    except Exception as sub_error:
+                        logging.error(f"Error suscribiéndose a {topic}: {sub_error}")
+                
+                logging.info(f"✅ Suscrito a todos los topics: {AWS_TOPICS}")
+                return True
+            else:
+                error_msg = "Error conectando a AWS IoT Core - falló connect()"
+                logging.error(error_msg)
+                connection_status["error"] = error_msg
+                return False
+        except Exception as connect_error:
+            error_msg = f"Error durante conexión AWS IoT: {connect_error}"
             logging.error(error_msg)
             connection_status["error"] = error_msg
             return False
@@ -168,31 +184,62 @@ def init_aws_iot_client():
         error_msg = f"Error inicializando AWS IoT: {e}"
         logging.error(error_msg)
         connection_status["error"] = error_msg
+        # Limpiar cliente en caso de error
+        aws_iot_client = None
         return False
 
 def aws_iot_connection_monitor():
     """Monitor de conexión AWS IoT en hilo separado"""
+    global aws_iot_client
     reconnect_attempts = 0
     max_reconnect_attempts = 5
     
     while True:
         try:
+            # Verificar estado de conexión
             if not connection_status["connected"] and reconnect_attempts < max_reconnect_attempts:
                 logging.warning(f"Cliente AWS IoT desconectado, reintentando... ({reconnect_attempts + 1}/{max_reconnect_attempts})")
+                
+                # Limpiar cliente anterior si existe
+                if aws_iot_client:
+                    try:
+                        aws_iot_client.disconnect()
+                    except:
+                        pass
+                    aws_iot_client = None
+                
+                # Intentar reconexión
                 if init_aws_iot_client():
                     reconnect_attempts = 0  # Reset counter on successful connection
+                    logging.info("✅ Reconexión exitosa a AWS IoT")
                 else:
                     reconnect_attempts += 1
-                    time.sleep(min(10 * reconnect_attempts, 60))  # Backoff exponencial limitado
+                    wait_time = min(10 * reconnect_attempts, 60)
+                    logging.warning(f"Reconexión fallida, esperando {wait_time}s antes del siguiente intento")
+                    time.sleep(wait_time)
+                    
             elif reconnect_attempts >= max_reconnect_attempts:
-                logging.error("Máximo de intentos de reconexión alcanzado. Esperando...")
+                logging.error("Máximo de intentos de reconexión alcanzado. Esperando 5 minutos...")
                 time.sleep(300)  # Esperar 5 minutos antes de reintentar
                 reconnect_attempts = 0  # Reset para reintentar
             else:
+                # Verificar conexión activa cada 30 segundos
+                if aws_iot_client:
+                    try:
+                        # Verificar si el cliente está realmente conectado (método más seguro)
+                        if hasattr(aws_iot_client, '_mqttCore') and hasattr(aws_iot_client._mqttCore, '_client'):
+                            if not aws_iot_client._mqttCore._client.is_connected():
+                                logging.warning("Conexión AWS IoT perdida, marcando como desconectado")
+                                connection_status["connected"] = False
+                    except Exception as check_error:
+                        logging.warning(f"Error verificando conexión AWS IoT: {check_error}")
+                        connection_status["connected"] = False
+                
                 time.sleep(30)  # Verificar cada 30 segundos si está conectado
                 
         except Exception as e:
             logging.error(f"Error en monitor de conexión AWS IoT: {e}")
+            connection_status["connected"] = False
             time.sleep(10)
 
 # -------------------------------
@@ -225,7 +272,9 @@ def aws_iot_loop():
         monitor_thread = threading.Thread(target=aws_iot_connection_monitor, daemon=True)
         monitor_thread.start()
 
-eventlet.spawn(aws_iot_loop)
+# Iniciar AWS IoT en un hilo separado usando threading en lugar de eventlet
+aws_iot_thread = threading.Thread(target=aws_iot_loop, daemon=True)
+aws_iot_thread.start()
 
 # -------------------------------
 # Endpoints adicionales para debugging
